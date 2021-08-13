@@ -31,9 +31,9 @@ Item on Cursor sorting:
 # While holding an item, click this button to mark it to guild tribute
 /hotbutton GTribute /echo loot guildtribute 1
 # While holding an item, click this button to mark it to keep
-/hotbutton Sell /echo loot keep 1
+/hotbutton Keep /echo loot keep 1
 # While holding an item, click this button to mark it to go to another person's inventory. (Not yet implemented)
-/hotbutton ParcelPlayerName /echo loot parcel PlayerName
+/hotbutton ParcelXackery /echo loot parcel Xackery
 ```
 - In another area, add these hotkeys:
 ```sh
