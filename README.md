@@ -60,5 +60,5 @@ LastMouseOverText=7,2,50,0,255,0,${If[${Cursor.ID},${Ini[loot.ini,"${Cursor.Name
 - Edit your Loot.ini to tweak any settings
 
 # Changelog
-- 2021-08-17 added sort
+- 2021-08-17 added sort, lore detection
 - 2021-08-13 initial version

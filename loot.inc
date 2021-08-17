@@ -117,6 +117,11 @@ sub LootCorpse
 			/continue
 		}
 
+		/if (${Corpse.Item[${i}].Lore} && ${FindItem[=${Corpse.Item[${i}]}].ID}) {
+			/echo leaving lore item we already have ${itemName}
+			/continue
+		}
+
 		/if (${itemAction.Equal[keep]}) {
 			/call LootItem ${i} Keep right
 			/varset LastLoot ${itemName}
