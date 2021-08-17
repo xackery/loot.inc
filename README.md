@@ -32,6 +32,8 @@ Item on Cursor sorting:
 /hotbutton GTribute /echo loot guildtribute 1
 # While holding an item, click this button to mark it to keep
 /hotbutton Keep /echo loot keep 1
+# Sort items so all known items go to bottom most bags
+/hotbutton Keep /echo sort
 # While holding an item, click this button to mark it to go to another person's inventory. (Not yet implemented)
 /hotbutton ParcelXackery /echo loot parcel Xackery
 ```
@@ -58,4 +60,5 @@ LastMouseOverText=7,2,50,0,255,0,${If[${Cursor.ID},${Ini[loot.ini,"${Cursor.Name
 - Edit your Loot.ini to tweak any settings
 
 # Changelog
+- 2021-08-17 added sort
 - 2021-08-13 initial version

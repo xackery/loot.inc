@@ -1,5 +1,3 @@
-| 2021-08-13 found at https://github.com/xackery/loot.inc
-
 #Event AdvLootLeave "[MQ2] advloot #1# leave"
 #Event AdvLootGive "[MQ2] advloot #1# give #2#"
 #Event AdvLootEnable "[MQ2] advloot enable 1"
@@ -14,21 +12,22 @@ Sub LootMain
 	/if (!${Defined[IsLootEnabled]}) /declare IsLootEnabled bool outer FALSE
 	/if (!${Defined[LastLoot]}) /declare LastLoot string outer
 	/if (!${Defined[LastLootCount]}) /declare LastLootCount int outer
+	/if (${Me.Casting.ID}) /return false
 	/if (!${Defined[IsHideLootedEnabled]}) {
 		/declare IsHideLootedEnabled bool outer true
 		/if (${IsHideLootedEnabled}) /hidec looted
 	}
 	/if (!${Me.FreeInventory}) /return false
-	/if (${Cursor.ID}) /return false	
+	/if (${Cursor.ID}) /return false
 	/if (!${IsLootEnabled}) /return false
 	/if (${Navigation.Active}) /return false
-
 	/if (${Window[LootWnd].Open} && ${Corpse.Items} == 0) {
 		/nomodkey /notify LootWnd LW_DoneButton leftmouseup
 		/delay 1s !${Corpse.Open}
 		/return true
 	}
 	
+	/if (${Me.CombatState.Equal[COMBAT]}) /return false
 	/declare i int local	
 	/declare corpseID int local ${NearestCorpseID[]}
 	/if (${corpseID} == 0) /return false
@@ -37,20 +36,20 @@ Sub LootMain
 		/return ${Macro.Return}
 	}
 	
-	/if (${Me.CombatState.Equal[COMBAT]}) /return false
 	/echo going to corpse ${Spawn[id ${corpseID}].Name} to loot
 	
 	/target id ${corpseID}
+:MoveToLoot	
 	/if (!${Navigation.MeshLoaded}) /moveto loc ${Target.Y} ${Target.X} ${Target.Z}
 	/if (${Navigation.MeshLoaded}) /nav spawn id ${corpseID}
+:GetNearLoot
 	/if (${NearestSpawn[id ${corpseID}].Distance3D} > 10) {
 		/doevents
 		/delay 3s !${Navigation.Active}
 		/doevents
 		/if (${Target.ID} != ${corpseID}) /return false
 		/doevents
-		|/echo going to corpse ${corpseName} to loot
-		/if (!${Navigation.Active})	/nav spawn ${merchantName}
+		/if (!${Navigation.Active})	/goto :MoveToLoot
 	}
 	/loot
 	/delay 2s ${Corpse.Open}
@@ -66,18 +65,16 @@ sub NearestCorpseID
 	/declare i int local
 	/declare nearestMobDistance float local 10000.0
 	/declare currentDistance float local
-	/declare nearestMobID int local 0
-	/declare mobarray[200] int local
-	/declare currentID int local
-	/for i 1 to ${SpawnCount[corpse radius 40 zradius 150]}
+	/declare nearestMobID int local 0	
+	/declare corpseID int local 0
+	/for i 1 to ${SpawnCount[corpse radius 40 zradius 150]}	
 		/if (${NearestSpawn[${i},corpse radius 40 zradius 150].Name.Find[_]} < 1) /continue
-		/varset currentID ${NearestSpawn[${i},corpse radius 40 zradius 150].ID}
-
-		/if (!${Navigation.MeshLoaded} && !${Navigation.PathExists[id ${currentID}]}) /continue
-		/varset currentDistance ${Navigation.PathLength[id ${currentID}]}
+		/varset corpseID ${NearestSpawn[${i},corpse radius 40 zradius 150].ID}
+		/if (!${Navigation.MeshLoaded} && !${Navigation.PathExists[id ${corpseID}]}) /continue
+		/varset currentDistance ${Navigation.PathLength[id ${corpseID}]}
 		/if (${currentDistance} > ${nearestMobDistance}) /continue
 		/varset nearestMobDistance ${currentDistance}
-		/varset nearestMobID ${currentID}
+		/varset nearestMobID ${corpseID}
 	/next i
 /return ${nearestMobID}
 
@@ -190,12 +187,18 @@ Sub Event_SetLoot(line, itemAction, itemOption)
 		/loadhud loot
 		/return
 	}
+	/if (${itemAction.Lower.Equal[sort]}) {
+		/call SortItems
+		/if (!${Macro.Return.Length}) /return
+		/echo SortItems: ${Macro.Return}
+		/return
+	}
 	/call EditIniLoot "${itemAction.Lower}"
 /return
 
 Sub EditIniLoot(itemAction)
 	/if (${Cursor.ID}==0) {
-		/echo No item on cursor to ${itemAction}.
+		/echo No item on cursor to ${itemAction}
 		/return
 	}
 	/if (!${itemAction.Equal[bazaar]} && !${itemAction.Equal[sell]} && !${itemAction.Find[vault]} && !${itemAction.Find[parcel]} && !${itemAction.Find[vault]} && !${itemAction.Find[bank]} && !${itemAction.Equal[personaltribute]} && !${itemAction.Equal[guildtribute]} && !${itemAction.Equal[ignore]}) {
@@ -471,7 +474,7 @@ Sub SellToVendor(itemName)
 	/nomodkey /shiftkey /notify merchantwnd MW_Sell_Button leftmouseup
 	/doevents
 	/if (${Macro.Return.Equal[TRUE]}) /return
-	/delay 2s
+	/delay 5
 	/if (${FindItemCount[=${itemName}]}) /goto :sell
 /return
 
@@ -655,4 +658,88 @@ Sub ClearChat
 		/ctrlkey /shiftkey /keypress delete chat
 		/delay 5
 		/if (${Window[MerchantWnd].Child[MW_Send_To_Edit].Text.Length}>0) /goto :Try1
+/return
+
+sub Event_Sort
+	/call SortItems
+	/if (!${Macro.Return.Length}) /return
+	/echo SortItems: ${Macro.Return}
+/return
+
+sub SortItems
+	/declare i int local
+	/declare j int local
+	/declare freeSlot string local
+	/declare lootItem string local
+	/declare lootAction string local
+	/declare bagID string local
+	/declare slotID int local
+	/declare itemAction string local
+	/if (${Cursor.ID}) /return take item off cursor first
+	/declare sortCount int local
+	/declare firstBagID int local
+	/declare firstSlotID int local
+
+	/varset freeSlot ${FirstFreeSlot[]}
+	/if (!${freeSlot.Length}) /return no first free slot found
+	/if (${freeSlot.Count[|]}==0) /return no pipe found in free slot filter		
+	/varset firstBagID ${freeSlot.Token[1,|]}
+	/varset firstSlotID ${freeSlot.Token[2,|]}
+
+    /for i 1 to 10
+        /if (${InvSlot[pack${i}].Item.Container}==0) /continue
+        |/if (!${Window[${i}].Open}) /itemnotify ${slot} rightmouseup
+		|/delay 5 ${Window[${i}].Open}
+		|if (!${Window[${i}].Open}) /return open bag ${i}
+		
+		| Set j 1 to number of bag slots and loop through slots looking for items marked sell
+        /for j 1 to ${InvSlot[pack${i}].Item.Container}
+			/if (${Int[${firstBagID}]} <= ${i} && ${Int[${firstSlotID}]} <= ${j}) /return sorted ${sortCount} items
+            /if (${InvSlot[pack${i}].Item.Item[${j}].ID}==0) /continue
+			/varset freeSlot ${LastFreeSlot[]}
+			/if (!${freeSlot.Length}) /return no last free slots found
+			/if (${freeSlot.Count[|]}==0) /return no pipe found in filter		
+			/varset bagID ${freeSlot.Token[1,|]}
+			/varset slotID ${freeSlot.Token[2,|]}
+
+	        /varset lootItem ${InvSlot[pack${i}].Item.Item[${j}].Name}
+			/varset itemAction ${Ini[${NinjaIniFile},"${lootItem.Left[1]}","${lootItem}"]}
+			/if (!${Bool[${itemAction}]}) /continue
+			/varcalc sortCount ${sortCount}+1
+			/nomodkey /shift /itemnotify in pack${i} ${j} leftmouseup
+			/delay 5 ${Cursor.ID}
+			/delay 5
+			
+			/if (!${Cursor.ID}) /return pick up ${lootItem} failed
+			/nomodkey /shift /itemnotify in pack${bagID} ${slotID} leftmouseup
+			/delay 5 !${Cursor.ID}
+			/if (${Cursor.ID}) /return drop ${lootItem} failed
+        /next j
+    /next i
+	/echo sorted ${sortCount} items
+/return
+
+
+sub FirstFreeSlot
+	/declare i int local
+	/declare j int local
+	
+    /for i 1 to 10
+        /if (${InvSlot[pack${i}].Item.Container}==0) /continue
+        /for j 1 to ${InvSlot[pack${i}].Item.Container}
+            /if (${InvSlot[pack${i}].Item.Item[${j}].ID}==0) /return ${i}|${j}
+        /next j
+    /next i
+/return
+
+sub LastFreeSlot
+	/declare i int local
+	/declare j int local
+	
+    /for i 10 downto 1
+        /if (${InvSlot[pack${i}].Item.Container}==0) /continue
+        /for j ${InvSlot[pack${i}].Item.Container} downto 1
+            /if (${InvSlot[pack${i}].Item.Item[${j}].ID}==0) /return ${i}|${j}
+        /next j
+    /next i
 /return
